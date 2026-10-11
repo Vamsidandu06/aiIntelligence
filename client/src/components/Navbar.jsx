@@ -231,6 +231,14 @@ export function Navbar() {
               <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
               <span>Docs</span>
             </Link>
+
+            <Link
+              to="/presentation"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition shadow-2xs"
+            >
+              <Award className="w-3.5 h-3.5 text-blue-600" />
+              <span>Pitch Deck</span>
+            </Link>
           </nav>
 
           {/* Right Action: 3 Demo Branch Triggers & Profile */}

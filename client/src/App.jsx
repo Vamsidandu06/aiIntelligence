@@ -36,6 +36,7 @@ import { CodingArenaPage } from './pages/CodingArenaPage.jsx';
 import { FrontendQueryPracticePage } from './pages/FrontendQueryPracticePage.jsx';
 import { ResumeBuilderPage } from './pages/ResumeBuilderPage.jsx';
 import { InterviewTipsPage } from './pages/InterviewTipsPage.jsx';
+import { PresentationPage } from './pages/PresentationPage.jsx';
 
 export default function App() {
   return (
@@ -123,6 +124,10 @@ export default function App() {
                   <Route path="/practice/query" element={<FrontendQueryPracticePage />} />
                   <Route path="/resume-builder" element={<ResumeBuilderPage />} />
                   <Route path="/interview-tips" element={<InterviewTipsPage />} />
+
+                  {/* Pitch & Presentation Deck */}
+                  <Route path="/presentation" element={<PresentationPage />} />
+                  <Route path="/pitch-deck" element={<PresentationPage />} />
 
                   {/* Catch-all redirect */}
                   <Route path="*" element={<Navigate to="/" replace />} />
