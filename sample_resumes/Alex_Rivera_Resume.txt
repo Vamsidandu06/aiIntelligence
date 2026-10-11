@@ -1,0 +1,28 @@
+ALEX RIVERA
+Senior Software & Machine Learning Engineer
+San Francisco, CA | alex.rivera@example.com | github.com/alexrivera-ai
+
+PROFESSIONAL SUMMARY
+Innovative Senior Full-Stack and Machine Learning Engineer with 5+ years designing resilient distributed architectures, end-to-end ML pipelines, and real-time web applications. Passionate about rigorous data validation, high-throughput systems, and production reliability.
+
+CORE COMPETENCIES & TECHNICAL SKILLS
+- Languages: Python, TypeScript, JavaScript, SQL, Go
+- Frameworks & Libraries: React, Node.js, Express, PyTorch, Scikit-Learn, FastAPI, Tailwind CSS
+- Databases & Storage: PostgreSQL, MongoDB, Redis
+- Cloud & DevOps: Docker, Kubernetes, AWS, GCP, GitHub Actions CI/CD
+- Concepts: Data Leakage Prevention, Distributed Caching, Query Plan Optimization, REST/GraphQL APIs
+
+PROFESSIONAL EXPERIENCE
+Senior AI Engineer | NeuralScale Inc. (2023 - Present)
+- Architected and deployed real-time predictive ML inference microservices serving 10M+ daily requests with <35ms p99 latency.
+- Experienced in SQL query optimization and PostgreSQL schema indexing, reducing batch pipeline runtime by 62%.
+- Built automated training pipelines with data validation safeguards preventing feature leakage and distribution drift.
+- Introduced automated drift detection alerts and rolling window validation strategies for sequential time-series forecasts.
+
+Full-Stack Engineer | CloudForge Systems (2021 - 2023)
+- Architected resilient RESTful microservices with Node.js and TypeScript handling high-concurrency event ingestion.
+- Implemented responsive frontend dashboards in React with real-time WebSocket state synchronization.
+- Optimized database query patterns and introduced Redis caching layers for sub-second search responses.
+
+EDUCATION
+B.S. in Computer Science | University of California, Berkeley
