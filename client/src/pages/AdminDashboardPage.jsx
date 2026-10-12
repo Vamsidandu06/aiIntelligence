@@ -392,10 +392,10 @@ export function AdminDashboardPage() {
                       Inspect Claims
                     </Link>
                     <Link
-                      to={`/decision?id=demo_session_1`}
+                      to={`/report?id=demo_session_1`}
                       className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] inline-block shadow-2xs"
                     >
-                      Review Dossier
+                      View Report
                     </Link>
                   </td>
                 </tr>

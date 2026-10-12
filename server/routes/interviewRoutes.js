@@ -149,10 +149,10 @@ router.post('/:id/start', async (req, res) => {
         usedAi = true;
       } catch (err) {
         console.warn('AI init question failed, using fallback:', err.message);
-        qData = fallbackEngine.getInitialQuestion();
+        qData = fallbackEngine.getInitialQuestion(interview.targetRole, interview.resumeText);
       }
     } else {
-      qData = fallbackEngine.getInitialQuestion();
+      qData = fallbackEngine.getInitialQuestion(interview.targetRole, interview.resumeText);
     }
 
     const firstQuestion = await storage.insert('questions', {
@@ -163,6 +163,7 @@ router.post('/:id/start', async (req, res) => {
       competencyName: qData.competencyName || priorityComp.name,
       rubricCriteria: qData.rubricCriteria,
       whyThisQuestion: qData.whyThisQuestion,
+      idealAnswer: qData.idealAnswer || '',
       expectedKeyConcepts: qData.expectedKeyConcepts || [],
       usedAi,
       createdAt: new Date().toISOString()

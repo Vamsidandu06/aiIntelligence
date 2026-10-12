@@ -97,10 +97,10 @@ export function InterviewResultsPage() {
 
         <div className="flex items-center gap-3">
           <Link
-            to={`/decision?id=${interviewId}`}
+            to={`/report?id=${interviewId}`}
             className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 shadow-xs transition"
           >
-            <span>Recruiter Decision Dossier</span>
+            <span>Candidate Intelligence Report</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
           <Link

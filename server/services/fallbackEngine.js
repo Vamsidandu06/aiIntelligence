@@ -2,6 +2,13 @@
  * Fallback & Deterministic Scenario Engine for Adaptive Interview Intelligence (AII)
  * Supports 100% offline demonstration, 0-4 Rubric scoring, and 3 distinct answer paths
  */
+import { 
+  QUESTION_BANK, 
+  detectResumeDomainGrip, 
+  getRandomInitialQuestion, 
+  getRandomAdaptiveQuestion, 
+  findQuestionByPromptOrId 
+} from './questionBank.js';
 
 // --- 1. JUNIOR SOFTWARE ENGINEER PRESET (Primary Demonstration Scenario per Section 16) ---
 export const JUNIOR_SWE_CANDIDATE = {
@@ -306,7 +313,7 @@ export class FallbackEngineService {
     };
   }
 
-  getInitialQuestion(role = "Senior AI & Full-Stack Engineer") {
+  getInitialQuestion(role = "Senior AI & Full-Stack Engineer", resumeText = "", options = {}) {
     const priorityCalc = this.calculateQuestionPriority({
       roleImportance: 0.95,
       evidenceUncertainty: 1.0,
@@ -316,32 +323,45 @@ export class FallbackEngineService {
       timeCostPenalty: 0.05
     });
 
-    const isJunior = role && (role.toLowerCase().includes("junior") || (role.toLowerCase().includes("software engineer") && !role.toLowerCase().includes("senior")));
-
-    if (isJunior) {
+    // 1. If resumeText is provided, analyze candidate's resume domain grip (ML, Backend, Frontend, SQL, DSA)
+    // and randomly select a question from their strongest domain!
+    if (resumeText && resumeText.trim().length > 0) {
+      const q = getRandomInitialQuestion({
+        resumeText,
+        targetRole: role,
+        excludeIds: options?.excludeIds || []
+      });
       return {
-        prompt: "Explain the internal mechanics of a Hash Map. How does it achieve average O(1) lookup time, and what strategies are used to resolve hash collisions?",
-        difficulty: "intermediate",
-        competencyName: "Data Structures",
-        estimatedDurationMinutes: 4,
-        rubricCriteria: "Level 4: Explains hash code calculation, bucket indexing via modulo, O(1) average vs O(n) worst case, and compares collision strategies (separate chaining vs open addressing). Level 2: Explains key-value lookup without collision handling. Level 1: Superficial explanation.",
-        whyThisQuestion: "Why this question? Selected as primary question because Data Structures is the highest-priority competency for the Junior Software Engineer role, and the candidate's resume prominently claims implementation of a custom key-value store with collision handling.",
-        uncertaintyToResolve: "Whether candidate understands low-level memory layout, hashing functions, and collision resolution trade-offs beyond standard library usage.",
-        expectedKeyConcepts: ["hash function", "bucket index", "modulo", "collision", "separate chaining", "open addressing", "O(1) average", "O(n) worst-case", "load factor"],
+        ...q,
         priorityCalculation: priorityCalc
       };
     }
 
-    // Default Senior AI / ML question
+    // 2. If target role specifies a domain or junior role
+    if (role && role !== "Senior AI & Full-Stack Engineer") {
+      const isJunior = role.toLowerCase().includes("junior") || (role.toLowerCase().includes("software engineer") && !role.toLowerCase().includes("senior"));
+      if (isJunior) {
+        const hashQ = findQuestionByPromptOrId("dsa-01") || QUESTION_BANK[24];
+        return {
+          ...hashQ,
+          priorityCalculation: priorityCalc
+        };
+      }
+      const q = getRandomInitialQuestion({
+        resumeText: "",
+        targetRole: role,
+        excludeIds: options?.excludeIds || []
+      });
+      return {
+        ...q,
+        priorityCalculation: priorityCalc
+      };
+    }
+
+    // 3. Default Senior AI / ML question for test suite consistency
+    const mlDefault = findQuestionByPromptOrId("ml-01") || QUESTION_BANK[0];
     return {
-      prompt: "Explain how you would prevent data leakage when training a machine learning model, and describe the specific architectural patterns or code practices you use.",
-      difficulty: "intermediate",
-      competencyName: "Machine Learning Pipelines & Data Integrity",
-      estimatedDurationMinutes: 4,
-      rubricCriteria: "Level 4: Explains why preprocessing must occur after split or inside pipelines. Identifies temporal/time-series leakage and group/entity leakage patterns. Level 2: Mentions train/test split without transformer encapsulation. Level 1: Superficial explanation.",
-      whyThisQuestion: "Why this question? Candidate's resume claims experience in automated training pipelines preventing feature leakage. This validates production data hygiene.",
-      uncertaintyToResolve: "Verification of candidate's claimed ability to prevent data leakage in production.",
-      expectedKeyConcepts: ["train/test split", "pipeline", "preprocessing", "temporal", "leakage", "group"],
+      ...mlDefault,
       priorityCalculation: priorityCalc
     };
   }
@@ -349,6 +369,8 @@ export class FallbackEngineService {
   evaluateAnswerOffline({ questionPrompt, rubricCriteria, competencyName, candidateAnswer }) {
     const text = (candidateAnswer || '').toLowerCase().trim();
     const wordCount = text.split(/\s+/).filter(Boolean).length;
+    const matchedQuestion = findQuestionByPromptOrId(questionPrompt);
+    const idealAnswer = matchedQuestion?.idealAnswer || "A complete, production-grade technical answer should explain underlying data structures, algorithmic complexity (average and worst case), edge cases, and architectural trade-offs.";
 
     // --- Check for Insufficient Evidence / Blank or Irrelevant Answer ---
     if (!candidateAnswer || wordCount < 8 || text === 'i like coding in python.') {
@@ -368,7 +390,9 @@ export class FallbackEngineService {
         assessmentExplanation: "Response was too brief or non-committal to substantiate technical competence. Marked as Insufficient evidence.",
         confidence: "high",
         uncertainty: "high",
-        recommendedFollowUp: "Ask candidate to clarify the fundamental mechanics."
+        recommendedFollowUp: "Ask candidate to clarify the fundamental mechanics.",
+        idealModelAnswer: idealAnswer,
+        candidateAnswer: candidateAnswer || ""
       };
     }
 
@@ -404,7 +428,9 @@ export class FallbackEngineService {
           assessmentExplanation: "Candidate demonstrated clear mastery of ML data integrity, explaining preprocessing isolation, temporal leakage hazards, and group entity isolation.",
           confidence: "high",
           uncertainty: "low",
-          recommendedFollowUp: "Escalate difficulty to Advanced: High-concurrency caching and distributed system architecture."
+          recommendedFollowUp: "Escalate difficulty to Advanced: High-concurrency caching and distributed system architecture.",
+          idealModelAnswer: idealAnswer,
+          candidateAnswer: candidateAnswer
         };
       }
 
@@ -433,7 +459,9 @@ export class FallbackEngineService {
           assessmentExplanation: "Candidate described high-level training and model selection, but did not establish how to prevent feature transformation leakage during preprocessing.",
           confidence: "high",
           uncertainty: "medium",
-          recommendedFollowUp: "Targeted Probe: You mentioned train_test_split, but how do you prevent feature transformation leakage during preprocessing?"
+          recommendedFollowUp: "Targeted Probe: You mentioned train_test_split, but how do you prevent feature transformation leakage during preprocessing?",
+          idealModelAnswer: idealAnswer,
+          candidateAnswer: candidateAnswer
         };
       }
 
@@ -458,8 +486,95 @@ export class FallbackEngineService {
         assessmentExplanation: "Candidate cited high-level library functions without explaining validation split safeguards or leakage prevention.",
         confidence: "medium",
         uncertainty: "high",
-        recommendedFollowUp: "Clarification Probe: Inquire how preprocessing steps are isolated from validation sets."
+        recommendedFollowUp: "Clarification Probe: Inquire how preprocessing steps are isolated from validation sets.",
+        idealModelAnswer: idealAnswer,
+        candidateAnswer: candidateAnswer
       };
+    }
+
+    const isHashMapQuestion = (competencyName && competencyName.includes("Data Structures")) || (questionPrompt && questionPrompt.toLowerCase().includes("hash map"));
+
+    // If this is a question from the 30-Question Bank (Backend, Frontend, SQL, ML, DSA) that is not the hardcoded hash map:
+    if (!isHashMapQuestion && matchedQuestion && matchedQuestion.expectedKeyConcepts?.length > 0) {
+      const concepts = matchedQuestion.expectedKeyConcepts;
+      
+      const isConceptPresent = (conceptStr) => {
+        const cLower = conceptStr.toLowerCase();
+        if (text.includes(cLower)) return true;
+        const words = cLower.split(/[\s\-_/]+/).filter(w => w.length > 2 && !['and', 'the', 'for', 'vs', 'with', 'from'].includes(w));
+        if (words.length === 0) return false;
+        const hitCount = words.filter(w => text.includes(w)).length;
+        return (hitCount / words.length) >= 0.6;
+      };
+
+      const matched = concepts.filter(isConceptPresent);
+      const missed = concepts.filter(c => !isConceptPresent(c));
+      const coverage = matched.length / concepts.length;
+
+      if (coverage >= 0.45 && wordCount >= 20) {
+        return {
+          hasSufficientEvidence: true,
+          score: Math.min(95, Math.max(85, Math.round(75 + coverage * 20))),
+          rubricLevel: 4,
+          rubricLabel: RUBRIC_LEVELS[4].label,
+          status: "Demonstrated",
+          skillState: "DEMONSTRATED",
+          technicalCorrectness: "high",
+          conceptualUnderstanding: "clear and comprehensive",
+          correctConcepts: matched.length > 0 ? matched : concepts.slice(0, 3),
+          missingConcepts: missed,
+          misunderstandings: [],
+          supportingExcerpts: [candidateAnswer.slice(0, 160) + "..."],
+          assessmentExplanation: `Candidate demonstrated solid technical understanding, properly addressing: ${matched.slice(0, 3).join(', ')}.`,
+          confidence: "high",
+          uncertainty: "low",
+          recommendedFollowUp: "Escalate difficulty to advanced architecture or edge-case trade-offs.",
+          idealModelAnswer: idealAnswer,
+          candidateAnswer: candidateAnswer
+        };
+      } else if (coverage >= 0.18 || wordCount >= 12) {
+        return {
+          hasSufficientEvidence: true,
+          score: Math.min(68, Math.max(48, Math.round(35 + coverage * 35))),
+          rubricLevel: 2,
+          rubricLabel: RUBRIC_LEVELS[2].label,
+          status: "Partially demonstrated",
+          skillState: "NOT DEMONSTRATED",
+          technicalCorrectness: "medium",
+          conceptualUnderstanding: "partial",
+          correctConcepts: matched.length > 0 ? matched : ["Discussed general architecture"],
+          missingConcepts: missed.length > 0 ? missed : ["Low-level mechanical implementation and edge-case handling"],
+          misunderstandings: missed.length > 0 ? [`Omitted key engineering mechanisms: ${missed.slice(0, 2).join(', ')}`] : [],
+          supportingExcerpts: [candidateAnswer.slice(0, 160) + "..."],
+          assessmentExplanation: `Candidate provided a high-level explanation but omitted essential mechanisms: ${missed.slice(0, 3).join(', ')}.`,
+          confidence: "high",
+          uncertainty: "medium",
+          recommendedFollowUp: `Targeted Probe: Could you explain how you handle ${missed[0] || 'the internal mechanics'}?`,
+          idealModelAnswer: idealAnswer,
+          candidateAnswer: candidateAnswer
+        };
+      } else {
+        return {
+          hasSufficientEvidence: true,
+          score: 35,
+          rubricLevel: 1,
+          rubricLabel: RUBRIC_LEVELS[1].label,
+          status: "Partially demonstrated",
+          skillState: "NOT DEMONSTRATED",
+          technicalCorrectness: "low",
+          conceptualUnderstanding: "superficial",
+          correctConcepts: ["High-level mention"],
+          missingConcepts: missed.length > 0 ? missed : concepts,
+          misunderstandings: ["Answer was too brief or superficial to demonstrate core competence."],
+          supportingExcerpts: [candidateAnswer.slice(0, 140) + "..."],
+          assessmentExplanation: "Candidate gave a superficial answer that failed to demonstrate practical engineering mechanisms.",
+          confidence: "high",
+          uncertainty: "high",
+          recommendedFollowUp: "Clarification probe on fundamental implementation.",
+          idealModelAnswer: idealAnswer,
+          candidateAnswer: candidateAnswer
+        };
+      }
     }
 
     // --- Junior SWE / Hash Map Branch ---
@@ -485,7 +600,9 @@ export class FallbackEngineService {
         assessmentExplanation: "Candidate mentioned language-level dictionary syntax, but did not demonstrate mechanical understanding of array indexing, hash codes, or collision resolution.",
         confidence: "medium",
         uncertainty: "high",
-        recommendedFollowUp: "Clarification Probe: Ask candidate how string keys are mapped into array memory indices under the hood."
+        recommendedFollowUp: "Clarification Probe: Ask candidate how string keys are mapped into array memory indices under the hood.",
+        idealModelAnswer: idealAnswer,
+        candidateAnswer: candidateAnswer
       };
     }
 
@@ -525,7 +642,9 @@ export class FallbackEngineService {
         assessmentExplanation: "Candidate demonstrated exemplary command of hash map internals, explaining index mapping, average vs worst-case bounds, and contrasting collision resolution paradigms.",
         confidence: "high",
         uncertainty: "low",
-        recommendedFollowUp: "Escalate difficulty to Advanced: Distributed caching and LRU cache implementation."
+        recommendedFollowUp: "Escalate difficulty to Advanced: Distributed caching and LRU cache implementation.",
+        idealModelAnswer: idealAnswer,
+        candidateAnswer: candidateAnswer
       };
     }
 
@@ -557,11 +676,23 @@ export class FallbackEngineService {
       assessmentExplanation: "Candidate explained high-level key-value mapping and average O(1) complexity, but completely omitted how hash collisions occur and how they are resolved.",
       confidence: "high",
       uncertainty: "medium",
-      recommendedFollowUp: "Targeted Probe: What happens when two distinct keys yield the exact same bucket index?"
+      recommendedFollowUp: "Targeted Probe: What happens when two distinct keys yield the exact same bucket index?",
+      idealModelAnswer: idealAnswer,
+      candidateAnswer: candidateAnswer
     };
   }
 
-  generateNextQuestionOffline({ previousEvaluation, questionIndex = 1, remainingQuestions = 3, role = "Senior AI & Full-Stack Engineer" }) {
+  generateNextQuestionOffline({ previousEvaluation, questionIndex = 1, remainingQuestions = 3, role = "Senior AI & Full-Stack Engineer", resumeText = "", askedQuestionIds = [] }) {
+    // If resumeText is provided, dynamically adapt across the 30-Question Bank based on resume domain!
+    if (resumeText && resumeText.trim().length > 0) {
+      return getRandomAdaptiveQuestion({
+        resumeText,
+        targetRole: role,
+        askedQuestionIds,
+        previousEvaluation
+      });
+    }
+
     const isJunior = role && (role.toLowerCase().includes("junior") || (role.toLowerCase().includes("software engineer") && !role.toLowerCase().includes("senior")));
 
     // Branch C: Clarification probe after ambiguous answer

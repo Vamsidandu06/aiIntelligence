@@ -232,10 +232,10 @@ export function CandidateComparisonPage() {
 
               <div className="pt-2 border-t border-slate-100 flex justify-end">
                 <Link
-                  to={`/decision?id=demo_session_1`}
-                  className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-semibold"
+                  to={`/report?id=demo_session_1`}
+                  className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-semibold text-xs"
                 >
-                  <span>View Full Dossier</span>
+                  <span>View Full Report</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>

@@ -45,11 +45,15 @@ export class AdaptiveEngineService {
     }
 
     // 2. Persist the answer record
+    const idealModelAnswer = evaluation.idealModelAnswer || question.idealAnswer || '';
+    evaluation.idealModelAnswer = idealModelAnswer;
+
     const answerRecord = await storage.insert('answers', {
       interviewId,
       questionId,
       candidateAnswer,
       evaluation,
+      idealModelAnswer,
       usedAi,
       submittedAt: new Date().toISOString()
     });
@@ -226,7 +230,9 @@ export class AdaptiveEngineService {
           previousEvaluation: lastEvaluation,
           questionIndex: previousAnswers.length,
           remainingQuestions: totalQuestions - previousAnswers.length,
-          role: interview.targetRole
+          role: interview.targetRole,
+          resumeText: interview.resumeText,
+          askedQuestionIds: previousQuestions.map(q => q.prompt || q.id)
         });
       }
     } else {
@@ -234,7 +240,9 @@ export class AdaptiveEngineService {
         previousEvaluation: lastEvaluation,
         questionIndex: previousAnswers.length,
         remainingQuestions: totalQuestions - previousAnswers.length,
-        role: interview.targetRole
+        role: interview.targetRole,
+        resumeText: interview.resumeText,
+        askedQuestionIds: previousQuestions.map(q => q.prompt || q.id)
       });
     }
 
@@ -248,6 +256,7 @@ export class AdaptiveEngineService {
       estimatedDurationMinutes: nextQuestionData.estimatedDurationMinutes || 4,
       rubricCriteria: nextQuestionData.rubricCriteria || 'Demonstrates technical correctness, practical application, and clarity.',
       whyThisQuestion: nextQuestionData.whyThisQuestion || strategy.reason,
+      idealAnswer: nextQuestionData.idealAnswer || '',
       uncertaintyToResolve: nextQuestionData.uncertaintyToResolve || strategy.uncertaintyToResolve,
       expectedKeyConcepts: nextQuestionData.expectedKeyConcepts || [],
       priorityCalculation: nextQuestionData.priorityCalculation || priorityCalculation,

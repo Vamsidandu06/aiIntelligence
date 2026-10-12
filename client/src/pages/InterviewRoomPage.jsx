@@ -43,7 +43,6 @@ import { AdaptivePipelineVisualizer } from '../components/AdaptivePipelineVisual
 import { CandidateWebcam } from '../components/CandidateWebcam.jsx';
 import { AIInterviewerAvatar } from '../components/AIInterviewerAvatar.jsx';
 import { PreInterviewCheck } from '../components/PreInterviewCheck.jsx';
-import { SCENARIO_PRESETS } from '../demo/demoScenarios.js';
 
 export function InterviewRoomPage() {
   const [searchParams] = useSearchParams();
@@ -287,6 +286,8 @@ export function InterviewRoomPage() {
           needsPractice,
           verbalSpeech,
           score,
+          candidateAnswer: transcriptToSubmit,
+          idealModelAnswer: evalData.idealModelAnswer || activeQuestion?.idealAnswer || 'A production-grade answer should formulate the internal algorithms, memory layouts, time/space complexity, and concrete architectural trade-offs.',
           missingConcepts: missing,
           correctConcepts: correct,
           isComplete: res?.isComplete,
@@ -302,7 +303,7 @@ export function InterviewRoomPage() {
         // AI speaks out whether candidate needs more practice or demonstrated mastery
         speakAloud(verbalSpeech);
       } else if (res?.isComplete) {
-        navigate(`/decision?id=${interviewId}`);
+        navigate(`/results?id=${interviewId}`);
       }
     } catch (err) {
       console.error('Submission error:', err);
@@ -317,7 +318,7 @@ export function InterviewRoomPage() {
     setIsAiSpeaking(false);
 
     if (evaluationFeedback?.isComplete) {
-      navigate(`/decision?id=${interviewId}`);
+      navigate(`/results?id=${interviewId}`);
       return;
     }
 
@@ -396,20 +397,20 @@ export function InterviewRoomPage() {
         </div>
       )}
 
-      {/* AI Answer Evaluation & Practice Recommendations Modal */}
+      {/* AI Answer Evaluation & Candidate vs Ideal Benchmark Comparison Modal */}
       {showFeedbackModal && evaluationFeedback && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md">
-          <div className={`max-w-2xl w-full rounded-3xl border p-6 sm:p-8 shadow-2xl relative overflow-hidden animate-in fade-in zoom-in-95 duration-200 ${
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+          <div className={`max-w-4xl w-full max-h-[90vh] overflow-y-auto rounded-3xl border p-5 sm:p-8 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200 ${
             evaluationFeedback.needsPractice 
               ? 'bg-slate-900 border-amber-500/40 shadow-amber-500/10' 
               : 'bg-slate-900 border-emerald-500/40 shadow-emerald-500/10'
           }`}>
             {/* Background ambient glow */}
-            <div className={`absolute -right-20 -top-20 w-64 h-64 rounded-full blur-3xl pointer-events-none ${
+            <div className={`absolute -right-20 -top-20 w-72 h-72 rounded-full blur-3xl pointer-events-none ${
               evaluationFeedback.needsPractice ? 'bg-amber-500/15' : 'bg-emerald-500/15'
             }`} />
 
-            {/* Header with status */}
+            {/* Header with status & score */}
             <div className="flex items-start justify-between border-b border-white/10 pb-4 mb-5 gap-4">
               <div className="flex items-center gap-3.5">
                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${
@@ -432,8 +433,8 @@ export function InterviewRoomPage() {
                     }`}>
                       {evaluationFeedback.needsPractice ? '⚠️ Needs More Practice' : '✅ Demonstrated Mastery'}
                     </span>
-                    <span className="text-xs font-mono text-slate-400">
-                      Rubric Score: {evaluationFeedback.score}%
+                    <span className="text-xs font-mono text-slate-300 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                      Score: {evaluationFeedback.score}%
                     </span>
                   </div>
                   <h3 className="text-lg sm:text-xl font-extrabold text-white mt-1">
@@ -449,16 +450,16 @@ export function InterviewRoomPage() {
               <button
                 type="button"
                 onClick={handleReplayFeedback}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-white/10 flex items-center gap-1.5 transition flex-shrink-0"
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-white/10 flex items-center gap-1.5 transition flex-shrink-0 cursor-pointer"
                 title="Listen to AI voice again"
               >
                 <Volume2 className="w-4 h-4 text-cyan-400" />
-                <span>Replay Voice</span>
+                <span className="hidden sm:inline">Replay Voice</span>
               </button>
             </div>
 
             {/* AI Verbal Feedback Box */}
-            <div className="p-4 rounded-2xl bg-slate-950/80 border border-white/5 space-y-2 mb-5">
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-950/80 border border-white/5 space-y-1.5 mb-5">
               <div className="flex items-center justify-between text-[11px] font-mono text-cyan-400">
                 <span className="flex items-center gap-1.5 font-bold">
                   <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
@@ -471,53 +472,95 @@ export function InterviewRoomPage() {
                   </span>
                 )}
               </div>
-              <p className="text-sm text-slate-200 italic font-sans leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-200 italic font-sans leading-relaxed">
                 "{evaluationFeedback.verbalSpeech}"
               </p>
             </div>
 
-            {/* Detailed Concept Breakdown */}
-            <div className="space-y-4 mb-6">
-              {evaluationFeedback.needsPractice && evaluationFeedback.missingConcepts?.length > 0 && (
+            {/* === SIDE-BY-SIDE: CANDIDATE ANSWER VS IDEAL BENCHMARK MODEL ANSWER === */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+              
+              {/* Left Column: Candidate's Submitted Answer */}
+              <div className="p-4 rounded-2xl bg-slate-950/70 border border-white/10 flex flex-col justify-between">
                 <div>
-                  <div className="text-[11px] font-bold text-amber-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5" />
-                    <span>Concepts Missing from Your Explanation (Recommended For Practice):</span>
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 border-b border-white/5 pb-2">
+                    <span className="flex items-center gap-1.5 text-slate-300">
+                      <FileText className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Your Submitted Answer:</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {evaluationFeedback.candidateAnswer ? evaluationFeedback.candidateAnswer.trim().split(/\s+/).length : 0} Words
+                    </span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {evaluationFeedback.missingConcepts.map((item, idx) => (
-                      <div key={idx} className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs font-medium flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                        <span>{item}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">Needs Practice</span>
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed font-sans whitespace-pre-wrap">
+                    {evaluationFeedback.candidateAnswer || '(No substantial text submitted)'}
+                  </p>
                 </div>
-              )}
 
-              {evaluationFeedback.correctConcepts?.length > 0 && (
+                {evaluationFeedback.correctConcepts?.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-white/5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block mb-1.5">
+                      ✓ Points You Covered:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {evaluationFeedback.correctConcepts.map((item, idx) => (
+                        <span key={idx} className="text-[11px] px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column: Ideal Benchmark Model Answer */}
+              <div className="p-4 rounded-2xl bg-gradient-to-b from-blue-950/30 to-slate-950/80 border border-cyan-500/30 flex flex-col justify-between shadow-inner">
                 <div>
-                  <div className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Concepts Successfully Demonstrated:</span>
+                  <div className="flex items-center justify-between text-[11px] font-bold text-cyan-300 uppercase tracking-wider mb-2 border-b border-cyan-500/20 pb-2">
+                    <span className="flex items-center gap-1.5">
+                      <Target className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Ideal Benchmark Model Answer:</span>
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono">
+                      Production Standard
+                    </span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {evaluationFeedback.correctConcepts.map((item, idx) => (
-                      <span key={idx} className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
-                        ✓ {item}
-                      </span>
-                    ))}
-                  </div>
+                  <p className="text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-wrap">
+                    {evaluationFeedback.idealModelAnswer || 'An ideal benchmark answer details data structure mechanics, time/space complexity bounds, edge case mitigations, and production architectural trade-offs.'}
+                  </p>
                 </div>
-              )}
 
-              {evaluationFeedback.evaluation?.assessmentExplanation && (
-                <div className="text-xs text-slate-400 pt-1 leading-relaxed">
-                  <strong className="text-slate-300">Detailed Diagnostic:</strong> {evaluationFeedback.evaluation.assessmentExplanation}
+                <div className="mt-3 pt-3 border-t border-cyan-500/20 text-[10px] text-cyan-300/80 italic">
+                  💡 Benchmark covers: architectural trade-offs, edge cases, and mechanical depth.
                 </div>
-              )}
+              </div>
+
             </div>
+
+            {/* Missing Concepts Gap Callout (if any) */}
+            {evaluationFeedback.needsPractice && evaluationFeedback.missingConcepts?.length > 0 && (
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 mb-5 space-y-2">
+                <div className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Knowledge Gaps Identified (Concepts To Practice):</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {evaluationFeedback.missingConcepts.map((item, idx) => (
+                    <div key={idx} className="px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs font-medium flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Detailed Diagnostic Explanation */}
+            {evaluationFeedback.evaluation?.assessmentExplanation && (
+              <div className="text-xs text-slate-400 mb-5 leading-relaxed bg-slate-950/50 p-3 rounded-xl border border-white/5">
+                <strong className="text-slate-300">Diagnostic Summary:</strong> {evaluationFeedback.evaluation.assessmentExplanation}
+              </div>
+            )}
 
             {/* Action Footer */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-white/10">
@@ -530,7 +573,7 @@ export function InterviewRoomPage() {
                     className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-lg shadow-amber-950/40 transition"
                   >
                     <Code2 className="w-4 h-4" />
-                    <span>Practice in Coding Arena (100+ Drills)</span>
+                    <span>Practice in Coding Arena</span>
                     <ExternalLink className="w-3 h-3 ml-0.5 opacity-70" />
                   </a>
 
@@ -555,9 +598,9 @@ export function InterviewRoomPage() {
               <button
                 type="button"
                 onClick={handleProceedAfterFeedback}
-                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-xs shadow-lg shadow-cyan-950/50 flex items-center justify-center gap-1.5 transition"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-xs shadow-lg shadow-cyan-950/50 flex items-center justify-center gap-1.5 transition cursor-pointer"
               >
-                <span>{evaluationFeedback.isComplete ? 'View Final Dossier' : 'Proceed to Next Question'}</span>
+                <span>{evaluationFeedback.isComplete ? 'View Evaluation Results' : 'Proceed to Next Question'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -691,8 +734,9 @@ export function InterviewRoomPage() {
                     Candidate Live Feed (Proctored)
                   </span>
                 </div>
-                <div className="text-[10px] text-slate-400 font-mono">
-                  AI Gaze Anomaly Monitor Active
+                <div className="text-[10px] text-emerald-400/90 font-mono flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Proctored Arena Active</span>
                 </div>
               </div>
 
@@ -748,44 +792,6 @@ export function InterviewRoomPage() {
               </div>
             </div>
 
-            {/* Quick-fill Scenario Branches for Testing & Hackathon Demonstration (Section 16) */}
-            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/10 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <Zap className="w-3.5 h-3.5 text-amber-400" />
-                  <span>3-Branch Adaptive Demonstration Presets (Section 16):</span>
-                </span>
-                <span className="text-[10px] text-slate-500">Click to autofill answer</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSpokenTranscript(`A hash map provides average O(1) time complexity for insertions and lookups by using a hash function to map keys to bucket indices in an underlying array. When a key is inserted, hash(key) % capacity yields the bucket index. In the average case, keys distribute uniformly. However, collisions occur when distinct keys produce the same index. We resolve this via Separate Chaining (each bucket holds a linked list or red-black tree) or Open Addressing (probing alternative buckets via linear probing). Without collision resolution, lookups degrade to O(n) worst-case. We maintain a load factor of 0.75 and dynamically rehash when exceeded.`)}
-                  className="p-2 rounded-xl bg-slate-800/90 hover:bg-emerald-950/60 border border-emerald-500/30 text-left text-xs text-emerald-300 transition cursor-pointer"
-                >
-                  <span className="font-bold block text-[11px]">Path A: Strong Answer</span>
-                  <span className="text-[10px] text-slate-400">Escalates to advanced LRU cache</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSpokenTranscript(`A hash map is an associative data structure that stores key-value pairs. It is very fast because lookups, insertions, and deletions take O(1) constant time on average. It works by taking a key, running it through a hashing algorithm, and getting an index so that you can look up the value directly in memory without having to loop through an array.`)}
-                  className="p-2 rounded-xl bg-slate-800/90 hover:bg-blue-950/60 border border-blue-500/30 text-left text-xs text-blue-300 transition cursor-pointer"
-                >
-                  <span className="font-bold block text-[11px]">Path B: Partial Answer</span>
-                  <span className="text-[10px] text-slate-400">Triggers collision follow-up</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSpokenTranscript(`Hash maps are fast because in Python dictionaries or JavaScript objects you just pass a key like myDict['user'] and it finds it instantly. It doesn't need to search through elements so it is constant time.`)}
-                  className="p-2 rounded-xl bg-slate-800/90 hover:bg-amber-950/60 border border-amber-500/30 text-left text-xs text-amber-300 transition cursor-pointer"
-                >
-                  <span className="font-bold block text-[11px]">Path C: Ambiguous Answer</span>
-                  <span className="text-[10px] text-slate-400">Triggers clarification request</span>
-                </button>
-              </div>
-            </div>
 
             {/* Editable Answer Textarea / Live Transcript Box */}
             <div className="space-y-4">
@@ -854,14 +860,14 @@ export function InterviewRoomPage() {
           <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto" />
           <h2 className="text-3xl font-extrabold text-white">Interview Concluded Successfully</h2>
           <p className="text-sm text-slate-300 leading-relaxed">
-            All spoken responses have been evaluated against competency rubrics. Your explainable decision intelligence dossier has been generated.
+            All technical answers have been evaluated against competency rubrics and compared with benchmark model answers. Your comprehensive performance report is ready.
           </p>
           <div className="pt-2">
             <Link
-              to={`/decision?id=${interviewId}`}
+              to={`/results?id=${interviewId}`}
               className="px-8 py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-sm shadow-xl transition inline-flex items-center gap-2"
             >
-              <span>View Recruiter Decision Intelligence Dossier</span>
+              <span>View Comprehensive Evaluation & Results</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
