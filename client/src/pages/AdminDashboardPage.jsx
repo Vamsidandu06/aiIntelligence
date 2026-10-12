@@ -7,29 +7,25 @@ import {
   HelpCircle, 
   CheckCircle2, 
   AlertCircle, 
-  UserPlus, 
   Search, 
   Activity, 
   ShieldAlert, 
   ArrowRight, 
   Sparkles, 
-  RefreshCw,
-  Lock,
-  Eye,
-  KeyRound,
-  FileText,
-  X,
-  Target,
-  Award,
-  BookOpen,
-  Code2,
-  Briefcase,
-  SlidersHorizontal,
-  ChevronRight,
-  TrendingUp,
-  BarChart3,
-  Filter,
-  Plus
+  Lock, 
+  Eye, 
+  KeyRound, 
+  FileText, 
+  X, 
+  Target, 
+  Award, 
+  BookOpen, 
+  Code2, 
+  Briefcase, 
+  ChevronRight, 
+  TrendingUp, 
+  BarChart3, 
+  Filter
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -126,60 +122,7 @@ export function AdminDashboardPage() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 text-slate-800">
-      
-      {/* Top Banner & Quick Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-100">
-              Recruiter Intelligence Command Center
-            </span>
-            <span className="text-xs text-slate-400">• Evidence & Pipeline Operations</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
-            Recruiter Intelligence Dashboard
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Real-time telemetry across active jobs, candidate evidence verifications, and non-punitive session reviews.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Link
-            to="/jobs/new"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 shadow-xs transition"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Create Job</span>
-          </Link>
-
-          <Link
-            to="/candidates/new"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold shadow-2xs transition"
-          >
-            <UserPlus className="w-3.5 h-3.5 text-slate-500" />
-            <span>Add Candidate</span>
-          </Link>
-
-          <Link
-            to="/compare"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold shadow-2xs transition"
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
-            <span>Compare Candidates</span>
-          </Link>
-
-          <button
-            onClick={fetchDashboardData}
-            title="Refresh dashboard"
-            className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-800 transition cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </div>
-
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 text-slate-800">
       {/* 8 Essential Recruiter Metrics (Section 15 Requirements) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         

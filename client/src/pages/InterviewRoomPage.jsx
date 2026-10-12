@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { 
   Sparkles, 
@@ -87,8 +87,8 @@ export function InterviewRoomPage() {
     }
   }, [interviewId]);
 
-  // Real-time Integrity Event Logger
-  const handleLogIntegrityEvent = async (type, details) => {
+  // Real-time Integrity Event Logger (memoized to prevent child re-rendering loops)
+  const handleLogIntegrityEvent = useCallback(async (type, details) => {
     if (!interviewId) return;
     try {
       await fetch('/api/integrity/event', {
@@ -104,7 +104,7 @@ export function InterviewRoomPage() {
     } catch (e) {
       console.warn('Failed to post integrity event:', e);
     }
-  };
+  }, [interviewId]);
 
   // Fullscreen and Tab Visibility listener
   useEffect(() => {

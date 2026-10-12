@@ -23,9 +23,26 @@ export function CandidateWebcam({ onIntegrityEvent, className = "" }) {
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const animFrameRef = useRef(null);
+  const onIntegrityEventRef = useRef(onIntegrityEvent);
 
-  // Initialize or re-initialize camera and audio stream
+  useEffect(() => {
+    onIntegrityEventRef.current = onIntegrityEvent;
+  }, [onIntegrityEvent]);
+
+  // Initialize camera and audio stream - runs once on mount unless explicit retry
   const initMedia = useCallback(async () => {
+    // If stream already exists with active tracks, ensure attached and avoid tearing down hardware
+    if (streamRef.current && streamRef.current.active) {
+      const activeVideo = streamRef.current.getVideoTracks().some(t => t.readyState === 'live');
+      if (activeVideo) {
+        if (videoRef.current && videoRef.current.srcObject !== streamRef.current) {
+          videoRef.current.srcObject = streamRef.current;
+          videoRef.current.play().catch(() => {});
+        }
+        return;
+      }
+    }
+
     try {
       setIsConnecting(true);
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -35,6 +52,7 @@ export function CandidateWebcam({ onIntegrityEvent, className = "" }) {
       // Stop previous stream if any
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
       }
 
       const userStream = await navigator.mediaDevices.getUserMedia({
@@ -94,8 +112,8 @@ export function CandidateWebcam({ onIntegrityEvent, className = "" }) {
         console.warn('Audio analyser init warning:', audioErr);
       }
 
-      if (onIntegrityEvent) {
-        onIntegrityEvent('camera_active', 'Live proctored video feed connected successfully.');
+      if (onIntegrityEventRef.current) {
+        onIntegrityEventRef.current('camera_active', 'Live proctored video feed connected successfully.');
       }
 
     } catch (err) {
@@ -104,7 +122,7 @@ export function CandidateWebcam({ onIntegrityEvent, className = "" }) {
     } finally {
       setIsConnecting(false);
     }
-  }, [onIntegrityEvent]);
+  }, []); // Stable callback: prevents teardown and blinking cycles
 
   useEffect(() => {
     initMedia();
@@ -112,6 +130,7 @@ export function CandidateWebcam({ onIntegrityEvent, className = "" }) {
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
       }
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close().catch(() => {});
@@ -174,8 +193,8 @@ export function CandidateWebcam({ onIntegrityEvent, className = "" }) {
         if (videoTrack.enabled && videoRef.current) {
           videoRef.current.play().catch(() => {});
         }
-        if (onIntegrityEvent) {
-          onIntegrityEvent(videoTrack.enabled ? 'camera_enabled' : 'camera_disabled', 
+        if (onIntegrityEventRef.current) {
+          onIntegrityEventRef.current(videoTrack.enabled ? 'camera_enabled' : 'camera_disabled', 
             `Candidate switched video camera ${videoTrack.enabled ? 'ON' : 'OFF'}`
           );
         }
@@ -206,8 +225,8 @@ export function CandidateWebcam({ onIntegrityEvent, className = "" }) {
         autoPlay
         playsInline
         muted
-        className={`w-full h-full object-cover transform -scale-x-100 transition-opacity duration-300 ${
-          permissionStatus === 'granted' && isCameraOn ? 'opacity-100 block' : 'opacity-0 hidden'
+        className={`w-full h-full object-cover transform -scale-x-100 transition-opacity duration-200 ${
+          permissionStatus === 'granted' && isCameraOn ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       />
 
