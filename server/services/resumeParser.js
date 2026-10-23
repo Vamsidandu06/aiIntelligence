@@ -94,7 +94,7 @@ export class ResumeParserService {
     
     for (let i = 0; i < Math.min(lines.length, 12); i++) {
       const line = lines[i]
-        .replace(/^(Resume|CV|Curriculum Vitae)\s*[:-]?\s*/i, '')
+        .replace(/^(Resume|CV|Curriculum Vitae|Name|Candidate|Applicant)\s*[:-]?\s*/i, '')
         .replace(/[|,•*].*$/, '') // remove trailing delimiter segments like "| Phone | Email"
         .trim();
 
@@ -164,7 +164,7 @@ export class ResumeParserService {
 
     // Extract Education
     let detectedEducation = null;
-    const eduMatch = text.match(/(?:B\.?Tech|B\.?E\.?|B\.?S\.?|B\.?C\.?A\.?|M\.?Tech|M\.?S\.?|M\.?C\.?A\.?|Bachelor|Master|Ph\.?D|Doctorate|Diploma|University|College|Institute|School)[^\n,.;]*/i);
+    const eduMatch = text.match(/\b(?:B\.?Tech|B\.?E\b|B\.?S\b|B\.?C\.?A\b|M\.?Tech|M\.?S\b|M\.?C\.?A\b|Bachelor\w*|Master\w*|Ph\.?D|Doctorate|Diploma|University|College|Institute|School)\b[^\n,.;]*/i);
     if (eduMatch) {
       detectedEducation = eduMatch[0].trim();
     } else {

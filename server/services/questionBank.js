@@ -661,7 +661,15 @@ const DOMAIN_KEYWORDS = {
  * Detect domain grip based on resume text and target role
  */
 export function detectResumeDomainGrip(resumeText = '', targetRole = '') {
-  const combined = `${resumeText} ${targetRole}`.toLowerCase();
+  // If targetRole is a generic placeholder, don't let it skew keyword matching
+  const isDefaultOrGenericRole = !targetRole || 
+    targetRole === 'Senior AI & Full-Stack Engineer' || 
+    targetRole === 'Software Engineer' || 
+    targetRole === 'Junior Software Engineer' ||
+    targetRole === 'Candidate';
+
+  const cleanRole = isDefaultOrGenericRole ? '' : targetRole;
+  const combined = `${resumeText} ${cleanRole}`.toLowerCase();
 
   const scores = {
     ml: 0,
@@ -683,29 +691,42 @@ export function detectResumeDomainGrip(resumeText = '', targetRole = '') {
     }
   }
 
-  // Find dominant domain
+  // Find dominant domain based on maximum score
   let dominantDomain = 'dsa';
-  let maxScore = -1;
+  let maxScore = 0;
 
-  // Check in preferred hierarchy if scores match
-  const priorityOrder = ['ml', 'backend', 'frontend', 'sql', 'dsa'];
-  for (const domain of priorityOrder) {
-    if (scores[domain] > maxScore && scores[domain] > 0) {
+  // Check which domain has highest score from resume
+  const domains = ['frontend', 'backend', 'ml', 'sql', 'dsa'];
+  for (const domain of domains) {
+    if (scores[domain] > maxScore) {
       maxScore = scores[domain];
       dominantDomain = domain;
     }
   }
 
-  // If role specifically specifies something, boost it
-  const lowerRole = (targetRole || '').toLowerCase();
-  if (lowerRole.includes('machine learning') || lowerRole.includes('ai') || lowerRole.includes('data scientist')) {
-    dominantDomain = 'ml';
-  } else if (lowerRole.includes('backend') || lowerRole.includes('server')) {
-    dominantDomain = 'backend';
-  } else if (lowerRole.includes('frontend') || lowerRole.includes('ui') || lowerRole.includes('web')) {
-    dominantDomain = 'frontend';
-  } else if (lowerRole.includes('database') || lowerRole.includes('sql') || lowerRole.includes('dba')) {
-    dominantDomain = 'sql';
+  // If role specifically specifies something explicit and non-generic, honor that role
+  const lowerRole = (targetRole || '').toLowerCase().trim();
+  if (!isDefaultOrGenericRole) {
+    if (lowerRole.includes('frontend') || lowerRole.includes('ui') || lowerRole.includes('web') || lowerRole.includes('react') || lowerRole.includes('client')) {
+      dominantDomain = 'frontend';
+    } else if (lowerRole.includes('backend') || lowerRole.includes('server') || lowerRole.includes('node') || lowerRole.includes('api')) {
+      dominantDomain = 'backend';
+    } else if (lowerRole.includes('sql') || lowerRole.includes('database') || lowerRole.includes('dba') || lowerRole.includes('data engineer')) {
+      dominantDomain = 'sql';
+    } else if (lowerRole.includes('machine learning') || lowerRole.includes('deep learning') || lowerRole.includes('data scientist') || /\bai\b/.test(lowerRole)) {
+      dominantDomain = 'ml';
+    } else if (lowerRole.includes('algorithm') || lowerRole.includes('dsa') || lowerRole.includes('systems') || lowerRole.includes('competitive')) {
+      dominantDomain = 'dsa';
+    }
+  }
+
+  // If still no scores and role was generic, check if role specifically mentions anything
+  if (maxScore === 0 && isDefaultOrGenericRole && targetRole) {
+    if (targetRole.toLowerCase().includes('frontend')) dominantDomain = 'frontend';
+    else if (targetRole.toLowerCase().includes('backend')) dominantDomain = 'backend';
+    else if (targetRole.toLowerCase().includes('sql')) dominantDomain = 'sql';
+    else if (targetRole.toLowerCase().includes('machine learning')) dominantDomain = 'ml';
+    else dominantDomain = 'dsa';
   }
 
   return {
@@ -720,12 +741,19 @@ export function detectResumeDomainGrip(resumeText = '', targetRole = '') {
 export function getRandomInitialQuestion({ resumeText = '', targetRole = 'Software Engineer', excludeIds = [] } = {}) {
   const { dominantDomain } = detectResumeDomainGrip(resumeText, targetRole);
 
-  // Filter pool by dominant domain
-  let candidatePool = QUESTION_BANK.filter(q => q.domain === dominantDomain && !excludeIds.includes(q.id));
+  // Filter pool by dominant domain and exclude asked IDs / prompts
+  let candidatePool = QUESTION_BANK.filter(q => 
+    q.domain === dominantDomain && 
+    !excludeIds.includes(q.id) &&
+    !excludeIds.some(asked => asked === q.id || asked === q.prompt)
+  );
 
   // If pool exhausted or empty, fall back to any unasked questions
   if (candidatePool.length === 0) {
-    candidatePool = QUESTION_BANK.filter(q => !excludeIds.includes(q.id));
+    candidatePool = QUESTION_BANK.filter(q => 
+      !excludeIds.includes(q.id) &&
+      !excludeIds.some(asked => asked === q.id || asked === q.prompt)
+    );
   }
 
   if (candidatePool.length === 0) {
@@ -763,27 +791,34 @@ export function getRandomAdaptiveQuestion({
 } = {}) {
   const { dominantDomain } = detectResumeDomainGrip(resumeText, targetRole);
 
-  // If previous question was demonstrated (high score), candidate can be escalated
-  // or tested on adjacent competencies (e.g. backend candidate tested on SQL or DSA)
+  const unasked = QUESTION_BANK.filter(q => 
+    !askedQuestionIds.includes(q.id) && 
+    !askedQuestionIds.some(asked => asked === q.id || asked === q.prompt || (typeof asked === 'string' && asked.includes(q.prompt.slice(0, 30))))
+  );
+
   let pool = [];
 
-  const unasked = QUESTION_BANK.filter(q => !askedQuestionIds.includes(q.id));
-
   if (previousEvaluation && (previousEvaluation.status === 'Demonstrated' || previousEvaluation.rubricLevel >= 3)) {
-    // Escalate difficulty to advanced or probe adjacent domains
+    // Escalate difficulty to advanced within same dominant domain
     const advancedInDomain = unasked.filter(q => q.domain === dominantDomain && q.difficulty === 'advanced');
     if (advancedInDomain.length > 0) {
       pool = advancedInDomain;
     } else {
-      // Pick unasked from dominant domain or adjacent technical domains
       pool = unasked.filter(q => q.domain === dominantDomain);
     }
   } else if (previousEvaluation && (previousEvaluation.status === 'Partially demonstrated' || previousEvaluation.rubricLevel <= 2)) {
     // Keep in same domain with intermediate or targeted probe
+    const intermediateInDomain = unasked.filter(q => q.domain === dominantDomain && q.difficulty === 'intermediate');
+    if (intermediateInDomain.length > 0) {
+      pool = intermediateInDomain;
+    } else {
+      pool = unasked.filter(q => q.domain === dominantDomain);
+    }
+  } else {
     pool = unasked.filter(q => q.domain === dominantDomain);
   }
 
-  // Fallback to any unasked questions
+  // If dominant domain questions are exhausted, fall back to any unasked questions
   if (pool.length === 0) {
     pool = unasked;
   }

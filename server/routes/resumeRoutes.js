@@ -80,11 +80,13 @@ router.post('/extract-competencies', async (req, res) => {
     if (!result) {
       // Deterministic dynamic extraction based on candidate's actual resume content
       const offline = resumeParser.extractKeyEntitiesOffline(resumeText);
-      const effectiveName = candidateName && candidateName.trim() && candidateName !== 'Alex Rivera'
-        ? candidateName.trim()
-        : (offline.candidateName && offline.candidateName !== 'Alex Rivera' ? offline.candidateName : 'Candidate');
+      const effectiveName = (offline.candidateName && offline.candidateName !== 'Candidate' && offline.candidateName !== 'Alex Rivera')
+        ? offline.candidateName
+        : (candidateName && candidateName.trim() && candidateName !== 'Alex Rivera' && candidateName.trim().toLowerCase() !== 'testing' ? candidateName.trim() : 'Candidate');
         
-      const effectiveRole = roleTitle || targetRole || offline.roleTitle || 'Software Engineer';
+      const effectiveRole = (offline.roleTitle && offline.roleTitle !== 'Software Engineer')
+        ? offline.roleTitle
+        : (roleTitle || targetRole || offline.roleTitle || 'Software Engineer');
       const skills = offline.skills || [];
 
       // Build dynamic competencies tailored to detected skills in resume

@@ -25,8 +25,8 @@ export function SetupPage() {
   const { user } = useAuth();
   const { loadInterview, startInterview } = useInterview();
 
-  // Inputs
-  const [candidateName, setCandidateName] = useState(user?.name || '');
+  // Inputs (auto-filled from uploaded resume or custom entry, independent of client login credentials)
+  const [candidateName, setCandidateName] = useState(user?.name && user.name.toLowerCase() !== 'testing' && user.name.toLowerCase() !== 'admin' ? user.name : '');
   const [targetRole, setTargetRole] = useState('');
   const [education, setEducation] = useState('');
   const [detectedSkills, setDetectedSkills] = useState([]);
@@ -99,6 +99,7 @@ export function SetupPage() {
     setFileUploadName(file.name);
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('resume', file);
 
     try {
       setIsExtracting(true);
@@ -107,11 +108,11 @@ export function SetupPage() {
       const extractedText = res.text || res.extractedText || '';
       setResumeText(extractedText);
 
-      // Auto-fill input fields immediately based on extracted resume
-      if (res.candidateName && (!candidateName || candidateName === 'Candidate' || candidateName === 'Alex Rivera')) {
+      // Auto-fill input fields immediately based on extracted resume (overriding default/account names)
+      if (res.candidateName && res.candidateName !== 'Candidate') {
         setCandidateName(res.candidateName);
       }
-      if (res.roleTitle && (!targetRole || targetRole === 'Senior AI & Full-Stack Engineer')) {
+      if (res.roleTitle) {
         setTargetRole(res.roleTitle);
       }
       if (res.education) {
@@ -172,16 +173,16 @@ export function SetupPage() {
         roleTitle: targetRole 
       });
       if (res.data) {
-        if (res.data.candidateName && (!candidateName || candidateName === 'Candidate')) {
+        if (res.data.candidateName && res.data.candidateName !== 'Candidate') {
           setCandidateName(res.data.candidateName);
         }
-        if (res.data.roleTitle && !targetRole) {
+        if (res.data.roleTitle) {
           setTargetRole(res.data.roleTitle);
         }
-        if (res.data.education && !education) {
+        if (res.data.education) {
           setEducation(res.data.education);
         }
-        if (res.data.detectedSkills) {
+        if (res.data.detectedSkills && res.data.detectedSkills.length > 0) {
           setDetectedSkills(res.data.detectedSkills);
         }
         setCompetencies(res.data.competencies || []);
@@ -297,7 +298,7 @@ export function SetupPage() {
               <span>1. Candidate Profile & Resume</span>
             </h2>
 
-            <div className="grid sm:grid-cols-2 gap-3">
+            <div className="grid sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Candidate Name</label>
                 <input
@@ -305,7 +306,7 @@ export function SetupPage() {
                   value={candidateName}
                   onChange={(e) => setCandidateName(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="e.g. Your Name (auto-fills upon upload)"
+                  placeholder="Auto-extracted from resume"
                 />
               </div>
 
@@ -316,7 +317,18 @@ export function SetupPage() {
                   value={targetRole}
                   onChange={(e) => setTargetRole(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="e.g. Full-Stack Developer, ML Engineer, SQL Specialist"
+                  placeholder="e.g. Frontend Engineer, ML Engineer"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Education / Degree</label>
+                <input
+                  type="text"
+                  value={education}
+                  onChange={(e) => setEducation(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholder="e.g. Computer Science, Stanford"
                 />
               </div>
             </div>

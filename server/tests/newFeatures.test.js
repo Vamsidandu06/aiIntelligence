@@ -276,6 +276,87 @@ Frontend & Full-Stack Developer at NexaTech (2024 - Present)
   assert.strictEqual(getRes.body.interview.candidateProfile.name, 'Vamsi Dandu');
 });
 
+test('Resume Credentials Precedence & Domain Role-Matching Questions (Frontend, ML, Backend, SQL)', async () => {
+  const frontendResume = `
+VAMSI DANDU
+Frontend Engineer | vamsi@example.com
+EDUCATION:
+B.Tech in Computer Science and Engineering | University College of Engineering
+SKILLS:
+React, TypeScript, JavaScript, HTML, CSS, Tailwind, Redux, Vite, Next.js
+EXPERIENCE:
+Built responsive Single Page Applications in React, optimized Virtual DOM re-rendering, and designed accessible component libraries.
+`.trim();
+
+  // 1. Even if client login sends 'Testing' as candidateName and generic targetRole,
+  // the server parses resumeText and prioritizes extracted credentials
+  const createRes = await request('POST', '/api/interviews', {
+    candidateName: 'Testing', // Client account name
+    targetRole: 'Frontend Engineer',
+    education: '',
+    skills: [],
+    resumeText: frontendResume,
+    jobDescription: 'Seeking a Frontend Engineer',
+    competencies: [
+      { name: 'Frontend Architecture & React', requiredLevel: 'intermediate', importance: 'high' }
+    ],
+    resumeClaims: [],
+    durationMinutes: 20,
+    totalQuestions: 4
+  });
+
+  assert.strictEqual(createRes.status, 201);
+  // Verify candidate name is extracted from resume, overriding 'Testing'
+  assert.strictEqual(createRes.body.interview.candidateName, 'Vamsi Dandu');
+  assert.strictEqual(createRes.body.interview.candidateProfile.name, 'Vamsi Dandu');
+  assert.strictEqual(createRes.body.interview.targetRole, 'Frontend Engineer');
+  assert.ok(createRes.body.interview.education.includes('B.Tech in Computer Science'));
+  // Ensure education did NOT get corrupted to 'MSI DANDU'
+  assert.ok(!createRes.body.interview.education.includes('MSI DANDU'));
+
+  // 2. Start interview and verify Q1 is selected from Frontend domain
+  const startRes = await request('POST', `/api/interviews/${createRes.body.interview.id}/start`);
+  assert.strictEqual(startRes.status, 200);
+  const q1 = startRes.body.question;
+  assert.ok(q1);
+  // Check that Q1 is a frontend question (React, Virtual DOM, CSS, Web Vitals, or component state)
+  const q1PromptLower = q1.prompt.toLowerCase();
+  assert.ok(
+    q1PromptLower.includes('react') ||
+    q1PromptLower.includes('dom') ||
+    q1PromptLower.includes('css') ||
+    q1PromptLower.includes('frontend') ||
+    q1PromptLower.includes('javascript') ||
+    q1PromptLower.includes('component'),
+    `Expected Frontend question, got: ${q1.prompt}`
+  );
+
+  // 3. Submit candidate answer to Q1 and verify Q2 also stays in Frontend domain
+  const answerRes = await request('POST', `/api/interviews/${createRes.body.interview.id}/answer`, {
+    questionId: q1.id,
+    candidateAnswer: 'React uses a Virtual DOM tree representation in JavaScript memory. During reconciliation, React diffs previous and next Virtual DOM trees and batches minimal patch operations to the real browser DOM to avoid expensive layout thrashing.'
+  });
+  assert.strictEqual(answerRes.status, 200);
+  assert.strictEqual(answerRes.body.isComplete, false);
+  const q2 = answerRes.body.nextQuestion;
+  assert.ok(q2);
+  const q2PromptLower = q2.prompt.toLowerCase();
+  assert.ok(
+    q2PromptLower.includes('react') ||
+    q2PromptLower.includes('dom') ||
+    q2PromptLower.includes('css') ||
+    q2PromptLower.includes('frontend') ||
+    q2PromptLower.includes('javascript') ||
+    q2PromptLower.includes('rendering') ||
+    q2PromptLower.includes('web vitals') ||
+    q2PromptLower.includes('component') ||
+    q2PromptLower.includes('state'),
+    `Expected Frontend Q2, got: ${q2.prompt}`
+  );
+  // Ensure Q2 is not identical to Q1
+  assert.notStrictEqual(q1.prompt, q2.prompt);
+});
+
 test('Teardown Server for New Features Test', async () => {
   if (server) {
     await new Promise((resolve) => server.close(resolve));

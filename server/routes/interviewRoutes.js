@@ -4,6 +4,7 @@ import { adaptiveEngine } from '../services/adaptiveEngine.js';
 import { reportGenerator } from '../services/reportGenerator.js';
 import { fallbackEngine } from '../services/fallbackEngine.js';
 import { geminiService } from '../services/geminiService.js';
+import { resumeParser } from '../services/resumeParser.js';
 
 const router = express.Router();
 
@@ -39,19 +40,44 @@ router.post('/', async (req, res) => {
       totalQuestions = 4
     } = req.body;
 
-    const resolvedSkills = Array.isArray(skills) && skills.length > 0 
-      ? skills 
+    let finalCandidateName = candidateName;
+    let finalTargetRole = targetRole;
+    let finalEducation = education;
+    let finalSkills = Array.isArray(skills) ? [...skills] : [];
+
+    if (resumeText && resumeText.trim().length > 10) {
+      const offline = resumeParser.extractKeyEntitiesOffline(resumeText);
+      if (offline.candidateName && offline.candidateName !== 'Candidate' && offline.candidateName !== 'Alex Rivera') {
+        if (!finalCandidateName || finalCandidateName === 'Candidate' || finalCandidateName.toLowerCase() === 'testing' || finalCandidateName === 'Alex Rivera') {
+          finalCandidateName = offline.candidateName;
+        }
+      }
+      if (offline.roleTitle && offline.roleTitle !== 'Software Engineer') {
+        if (!finalTargetRole || finalTargetRole === 'Software Engineer' || finalTargetRole === 'Senior AI & Full-Stack Engineer') {
+          finalTargetRole = offline.roleTitle;
+        }
+      }
+      if (offline.education && (!finalEducation || finalEducation === 'Computer Science & Engineering')) {
+        finalEducation = offline.education;
+      }
+      if ((!finalSkills || finalSkills.length === 0) && offline.skills && offline.skills.length > 0) {
+        finalSkills = offline.skills;
+      }
+    }
+
+    const resolvedSkills = Array.isArray(finalSkills) && finalSkills.length > 0 
+      ? finalSkills 
       : (competencies && competencies.length > 0 ? competencies.map(c => c.name) : ['Software Engineering', 'Problem Solving']);
 
     const interview = await storage.insert('interviews', {
-      candidateName,
-      targetRole,
-      education: education || 'Computer Science & Engineering',
+      candidateName: finalCandidateName,
+      targetRole: finalTargetRole,
+      education: finalEducation || 'Computer Science & Engineering',
       skills: resolvedSkills,
       candidateProfile: {
-        name: candidateName,
-        role: targetRole,
-        education: education || 'Computer Science & Engineering',
+        name: finalCandidateName,
+        role: finalTargetRole,
+        education: finalEducation || 'Computer Science & Engineering',
         skills: resolvedSkills
       },
       resumeText,

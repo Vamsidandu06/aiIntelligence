@@ -323,24 +323,10 @@ export class FallbackEngineService {
       timeCostPenalty: 0.05
     });
 
-    // 1. If resumeText is provided, analyze candidate's resume domain grip (ML, Backend, Frontend, SQL, DSA)
-    // and randomly select a question from their strongest domain!
-    if (resumeText && resumeText.trim().length > 0) {
-      const q = getRandomInitialQuestion({
-        resumeText,
-        targetRole: role,
-        excludeIds: options?.excludeIds || []
-      });
-      return {
-        ...q,
-        priorityCalculation: priorityCalc
-      };
-    }
-
-    // 2. If target role specifies a domain or junior role
-    if (role && role !== "Senior AI & Full-Stack Engineer") {
-      const isJunior = role.toLowerCase().includes("junior") || (role.toLowerCase().includes("software engineer") && !role.toLowerCase().includes("senior"));
-      if (isJunior) {
+    // 1. If resumeText or role specifies a target domain, select from that domain
+    if ((resumeText && resumeText.trim().length > 0) || (role && role !== "Senior AI & Full-Stack Engineer")) {
+      const isJuniorGeneric = role && (role.toLowerCase() === "junior software engineer" || role.toLowerCase() === "software engineer") && (!resumeText || !resumeText.trim());
+      if (isJuniorGeneric) {
         const hashQ = findQuestionByPromptOrId("dsa-01") || QUESTION_BANK[24];
         return {
           ...hashQ,
@@ -348,7 +334,7 @@ export class FallbackEngineService {
         };
       }
       const q = getRandomInitialQuestion({
-        resumeText: "",
+        resumeText: resumeText || "",
         targetRole: role,
         excludeIds: options?.excludeIds || []
       });
@@ -358,7 +344,7 @@ export class FallbackEngineService {
       };
     }
 
-    // 3. Default Senior AI / ML question for test suite consistency
+    // 2. Default Senior AI / ML question for test suite consistency
     const mlDefault = findQuestionByPromptOrId("ml-01") || QUESTION_BANK[0];
     return {
       ...mlDefault,
@@ -683,10 +669,11 @@ export class FallbackEngineService {
   }
 
   generateNextQuestionOffline({ previousEvaluation, questionIndex = 1, remainingQuestions = 3, role = "Senior AI & Full-Stack Engineer", resumeText = "", askedQuestionIds = [] }) {
-    // If resumeText is provided, dynamically adapt across the 30-Question Bank based on resume domain!
-    if (resumeText && resumeText.trim().length > 0) {
+    // If resumeText is provided, or if role specifies a domain (e.g. frontend, backend, sql, ml),
+    // dynamically adapt across the 30-Question Bank based on resume domain grip and target role!
+    if ((resumeText && resumeText.trim().length > 0) || (role && role !== "Senior AI & Full-Stack Engineer" && role !== "Junior Software Engineer")) {
       return getRandomAdaptiveQuestion({
-        resumeText,
+        resumeText: resumeText || "",
         targetRole: role,
         askedQuestionIds,
         previousEvaluation
