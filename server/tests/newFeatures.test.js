@@ -205,6 +205,77 @@ test('Resume Builder & Interview Tips', async () => {
   assert.ok(tipsRes.body.tips.length >= 4);
 });
 
+test('Dynamic Resume Parsing & Interview Creation - uses user resume and credentials, not sample data', async () => {
+  const userResume = `
+VAMSI DANDU
+Full-Stack Engineer | vamsi.dandu@example.com | San Francisco, CA
+
+EDUCATION:
+B.Tech in Computer Science and Engineering | University College of Engineering
+
+SUMMARY:
+Passionate full-stack developer with hands-on expertise building responsive modern React web applications and Node.js REST APIs with PostgreSQL.
+
+TECHNICAL SKILLS:
+React, TypeScript, JavaScript, Node.js, Express, PostgreSQL, SQL, Redis, Git, Docker
+
+WORK EXPERIENCE:
+Frontend & Full-Stack Developer at NexaTech (2024 - Present)
+- Architected high-performance React client-side dashboards reducing render latency by 45%.
+- Implemented state management using Redux and optimized Virtual DOM reconciliation.
+- Engineered PostgreSQL relational schemas and indexed database queries for fast retrieval.
+`.trim();
+
+  // 1. Parse resume text
+  const parseRes = await request('POST', '/api/resume/parse', { resumeText: userResume });
+  assert.strictEqual(parseRes.status, 200);
+  assert.strictEqual(parseRes.body.candidateName, 'Vamsi Dandu');
+  assert.ok(parseRes.body.detectedSkills.includes('React'));
+  assert.ok(parseRes.body.detectedSkills.includes('SQL'));
+
+  // 2. Extract competencies
+  const compRes = await request('POST', '/api/resume/extract-competencies', {
+    resumeText: userResume,
+    jobDescription: 'Seeking a Full-Stack React & Node.js Developer',
+    candidateName: 'Vamsi Dandu',
+    targetRole: 'Full-Stack Developer'
+  });
+  assert.strictEqual(compRes.status, 200);
+  assert.strictEqual(compRes.body.data.candidateName, 'Vamsi Dandu');
+  assert.strictEqual(compRes.body.data.roleTitle, 'Full-Stack Developer');
+  assert.ok(compRes.body.data.competencies.some(c => c.name.includes('Frontend') || c.name.includes('Backend') || c.name.includes('Database')));
+
+  // 3. Create interview with candidate's actual credentials
+  const createRes = await request('POST', '/api/interviews', {
+    candidateName: 'Vamsi Dandu',
+    targetRole: 'Full-Stack Developer',
+    education: 'B.Tech in Computer Science and Engineering',
+    skills: ['React', 'TypeScript', 'Node.js', 'PostgreSQL'],
+    resumeText: userResume,
+    jobDescription: 'Seeking a Full-Stack React & Node.js Developer',
+    competencies: compRes.body.data.competencies,
+    resumeClaims: compRes.body.data.resumeClaims,
+    durationMinutes: 20,
+    totalQuestions: 4
+  });
+  assert.strictEqual(createRes.status, 201);
+  assert.strictEqual(createRes.body.interview.candidateName, 'Vamsi Dandu');
+  assert.strictEqual(createRes.body.interview.candidateProfile.name, 'Vamsi Dandu');
+  assert.strictEqual(createRes.body.interview.candidateProfile.education, 'B.Tech in Computer Science and Engineering');
+
+  // 4. Start interview and verify first question is generated dynamically
+  const startRes = await request('POST', `/api/interviews/${createRes.body.interview.id}/start`);
+  assert.strictEqual(startRes.status, 200);
+  assert.ok(startRes.body.question);
+  assert.ok(startRes.body.question.prompt.length > 20);
+
+  // 5. Retrieve interview state
+  const getRes = await request('GET', `/api/interviews/${createRes.body.interview.id}`);
+  assert.strictEqual(getRes.status, 200);
+  assert.strictEqual(getRes.body.interview.candidateName, 'Vamsi Dandu');
+  assert.strictEqual(getRes.body.interview.candidateProfile.name, 'Vamsi Dandu');
+});
+
 test('Teardown Server for New Features Test', async () => {
   if (server) {
     await new Promise((resolve) => server.close(resolve));

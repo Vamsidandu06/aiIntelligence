@@ -17,19 +17,23 @@ import {
   ExternalLink 
 } from 'lucide-react';
 import { useInterview } from '../context/InterviewContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+import { api } from '../api/client.js';
 
 export function ResumeBuilderPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { setResumeText, setJobDescription } = useInterview();
 
   // Resume State
   const [personal, setPersonal] = useState({
-    name: 'Alex Rivera',
-    email: 'alex@cloudscale.io',
-    phone: '+1 (555) 234-5678',
-    location: 'San Francisco, CA',
-    github: 'github.com/alexrivera-ai',
-    targetRole: 'Lead Machine Learning Engineer'
+    name: user?.name || '',
+    email: user?.email || '',
+    phone: '',
+    location: '',
+    github: '',
+    targetRole: 'Full-Stack Software Engineer',
+    education: 'Computer Science & Engineering'
   });
 
   const [summary, setSummary] = useState(
@@ -101,7 +105,7 @@ export function ResumeBuilderPage() {
     window.print();
   };
 
-  const handleLaunchInterview = () => {
+  const handleLaunchInterview = async () => {
     // Compile structured resume into clean text
     const compiled = `
 CANDIDATE: ${personal.name}
@@ -121,12 +125,58 @@ TECHNICAL SKILLS:
 ${skills}
 `.trim();
 
-    const targetJD = `We are seeking a high-performing ${personal.targetRole} with strong expertise in model training pipelines, leakage prevention, distributed systems, and algorithmic efficiency.`;
+    const targetJD = `Position: ${personal.targetRole || 'Software Engineer'}\nKey Responsibilities:\n- Deliver robust, high-performance software systems adhering to clean design principles.\n- Articulate clear engineering trade-offs during live technical evaluation.`;
 
     if (setResumeText) setResumeText(compiled);
     if (setJobDescription) setJobDescription(targetJD);
 
-    navigate('/interview');
+    sessionStorage.setItem('aii_draft_resume', JSON.stringify({
+      name: personal.name,
+      targetRole: personal.targetRole,
+      education: personal.education,
+      skills: skills.split(',').map(s => s.trim()).filter(Boolean),
+      resumeText: compiled,
+      jobDescription: targetJD
+    }));
+
+    try {
+      const skillsArray = skills.split(',').map(s => s.trim()).filter(Boolean);
+      const comps = (skillsArray.length > 0 ? skillsArray : ['Software Engineering', 'Problem Solving']).slice(0, 5).map((sk, idx) => ({
+        name: sk,
+        category: 'technical',
+        requiredLevel: 'intermediate',
+        importance: idx < 2 ? 'high' : 'medium',
+        description: `Practical implementation and conceptual mastery in ${sk}`,
+        initialStatus: 'Claimed but unvalidated'
+      }));
+
+      const claims = experiences.flatMap(e => e.bullets).filter(Boolean).map((b, i) => ({
+        id: `rb_claim_${i + 1}`,
+        claimText: b,
+        category: 'technical',
+        targetCompetency: skillsArray[0] || 'Software Engineering',
+        verificationStatus: 'untested'
+      }));
+
+      const res = await api.createInterview({
+        candidateName: personal.name || 'Candidate',
+        targetRole: personal.targetRole || 'Software Engineer',
+        education: personal.education || 'Computer Science & Engineering',
+        skills: skillsArray,
+        resumeText: compiled,
+        jobDescription: targetJD,
+        competencies: comps,
+        resumeClaims: claims,
+        durationMinutes: 20,
+        totalQuestions: 4
+      });
+
+      await api.startInterview(res.interview.id);
+      navigate(`/interview?id=${res.interview.id}`);
+    } catch (err) {
+      console.warn('Failed to auto-create session from builder, navigating to setup:', err);
+      navigate('/setup');
+    }
   };
 
   return (

@@ -29,6 +29,8 @@ router.post('/', async (req, res) => {
     const {
       candidateName = 'Candidate',
       targetRole = 'Software Engineer',
+      education = '',
+      skills = [],
       resumeText = '',
       jobDescription = '',
       competencies = [],
@@ -37,9 +39,21 @@ router.post('/', async (req, res) => {
       totalQuestions = 4
     } = req.body;
 
+    const resolvedSkills = Array.isArray(skills) && skills.length > 0 
+      ? skills 
+      : (competencies && competencies.length > 0 ? competencies.map(c => c.name) : ['Software Engineering', 'Problem Solving']);
+
     const interview = await storage.insert('interviews', {
       candidateName,
       targetRole,
+      education: education || 'Computer Science & Engineering',
+      skills: resolvedSkills,
+      candidateProfile: {
+        name: candidateName,
+        role: targetRole,
+        education: education || 'Computer Science & Engineering',
+        skills: resolvedSkills
+      },
       resumeText,
       jobDescription,
       resumeClaims,

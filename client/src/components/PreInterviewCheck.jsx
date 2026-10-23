@@ -140,10 +140,12 @@ export function PreInterviewCheck({ onComplete, candidateData }) {
     });
   };
 
-  const candidateName = candidateData?.name || 'Alex Rivera';
-  const university = candidateData?.university || 'Stanford University / B.S. Computer Science';
-  const targetRole = candidateData?.role || 'Lead Machine Learning Engineer';
-  const skills = candidateData?.skills || ['Python', 'PyTorch', 'Distributed Systems', 'ML Pipelines'];
+  const candidateName = candidateData?.name || 'Candidate';
+  const university = candidateData?.university || 'Computer Science & Engineering';
+  const targetRole = candidateData?.role || 'Software Engineer';
+  const skills = Array.isArray(candidateData?.skills) && candidateData.skills.length > 0 
+    ? candidateData.skills 
+    : ['Software Engineering', 'Problem Solving'];
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center p-4 overflow-y-auto">

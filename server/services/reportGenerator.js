@@ -96,8 +96,8 @@ export class ReportGeneratorService {
 
     const report = {
       interviewId,
-      candidateName: interview.candidateName || 'Alex Rivera',
-      targetRole: interview.targetRole || 'Senior AI & Full-Stack Engineer',
+      candidateName: interview.candidateName || interview.candidateProfile?.name || 'Candidate',
+      targetRole: interview.targetRole || interview.candidateProfile?.role || 'Software Engineer',
       generatedAt: new Date().toISOString(),
       durationMinutes: interview.durationMinutes || 20,
       competencies,

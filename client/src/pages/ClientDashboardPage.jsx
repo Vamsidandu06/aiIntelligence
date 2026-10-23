@@ -49,7 +49,7 @@ export function ClientDashboardPage() {
   }, [refreshUser]);
 
   // Candidate metrics (with safe fallbacks)
-  const candidateName = user?.name || 'Alex Rivera';
+  const candidateName = user?.name || 'Candidate';
   const totalHours = user?.totalHours !== undefined ? Number(user.totalHours).toFixed(1) : '14.2';
   const questionsSolved = user?.questionsSolved !== undefined ? user.questionsSolved : 48;
   const interviewsAttended = user?.interviewsAttended !== undefined ? user.interviewsAttended : 4;
@@ -213,7 +213,7 @@ export function ClientDashboardPage() {
             
             {/* Card 1: Adaptive Live AI Interview */}
             <Link
-              to="/interview"
+              to="/setup"
               className="p-6 rounded-2xl bg-gradient-to-br from-slate-900 to-cyan-950/40 border border-cyan-500/30 hover:border-cyan-400 transition group relative overflow-hidden"
             >
               <div className="w-12 h-12 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center mb-4 group-hover:scale-110 transition">

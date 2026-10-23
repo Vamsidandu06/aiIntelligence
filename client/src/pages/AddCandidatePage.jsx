@@ -68,15 +68,21 @@ export function AddCandidatePage() {
     setUploading(true);
     try {
       const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
       uploadFormData.append('resume', file);
       const res = await api.parseResumeFile(uploadFormData);
-      if (res.extractedText) {
-        setFormData(f => ({ ...f, resumeText: res.extractedText }));
+      const text = res.extractedText || res.text || '';
+      if (text) {
+        setFormData(f => ({ 
+          ...f, 
+          resumeText: text,
+          name: f.name || (res.candidateName && res.candidateName !== 'Candidate' ? res.candidateName : f.name),
+          targetRole: f.targetRole || res.roleTitle || f.targetRole
+        }));
         setExtractedData(res);
       }
     } catch (err) {
       console.warn('Resume file parsing fallback:', err.message);
-      // Fallback text preview
       setError('Document parsing note: Server returned fallback. You can inspect or edit the resume text below.');
     } finally {
       setUploading(false);

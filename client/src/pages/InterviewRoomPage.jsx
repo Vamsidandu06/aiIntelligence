@@ -84,6 +84,19 @@ export function InterviewRoomPage() {
   useEffect(() => {
     if (interviewId) {
       loadInterview(interviewId);
+    } else {
+      // Find latest interview or redirect to setup
+      api.getInterviews().then(res => {
+        const list = res.interviews || [];
+        if (list.length > 0) {
+          const latest = list[list.length - 1];
+          navigate(`/interview?id=${latest.id}`, { replace: true });
+        } else {
+          navigate('/setup', { replace: true });
+        }
+      }).catch(() => {
+        navigate('/setup', { replace: true });
+      });
     }
   }, [interviewId]);
 
@@ -362,10 +375,11 @@ export function InterviewRoomPage() {
 
   const isCompleted = interview?.status === 'completed';
 
-  // Candidate Resume Profile Details
-  const candidateName = interview?.candidateProfile?.name || 'Alex Rivera';
-  const university = 'Stanford University • B.S. Computer Science';
-  const targetRole = interview?.targetRole || 'Lead Machine Learning Engineer';
+  // Candidate Resume Profile Details - cleanly resolve from interview data
+  const candidateName = interview?.candidateName || interview?.candidateProfile?.name || 'Candidate';
+  const university = interview?.education || interview?.candidateProfile?.education || 'Computer Science & Engineering';
+  const targetRole = interview?.targetRole || interview?.candidateProfile?.role || 'Software Engineer';
+  const resolvedSkills = interview?.skills || interview?.candidateProfile?.skills || (competencies && competencies.length > 0 ? competencies.map(c => c.name) : ['Software Engineering', 'Problem Solving']);
 
   return (
     <div className={`min-h-screen ${isFullscreen ? 'bg-slate-950 p-4 sm:p-6 text-white' : 'bg-slate-950 text-slate-100 p-4 sm:p-6'}`}>
@@ -378,7 +392,7 @@ export function InterviewRoomPage() {
             name: candidateName,
             university,
             role: targetRole,
-            skills: ['Python', 'PyTorch', 'Distributed Systems', 'ML Pipelines']
+            skills: resolvedSkills
           }}
         />
       )}

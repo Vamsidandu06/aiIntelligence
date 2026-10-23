@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Upload, 
   FileText, 
@@ -15,15 +15,21 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client.js';
 import { useInterview } from '../context/InterviewContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 
 export function SetupPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const candidateIdParam = searchParams.get('candidateId');
+  const { user } = useAuth();
   const { loadInterview, startInterview } = useInterview();
 
   // Inputs
-  const [candidateName, setCandidateName] = useState('Alex Rivera');
-  const [targetRole, setTargetRole] = useState('Senior AI & Full-Stack Engineer');
+  const [candidateName, setCandidateName] = useState(user?.name || '');
+  const [targetRole, setTargetRole] = useState('');
+  const [education, setEducation] = useState('');
+  const [detectedSkills, setDetectedSkills] = useState([]);
   const [resumeText, setResumeText] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [fileUploadName, setFileUploadName] = useState('');
@@ -37,7 +43,39 @@ export function SetupPage() {
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState(null);
 
-  // Preload Sample Candidate Alex Rivera
+  // Auto-fill from candidateId parameter or draft resume stored in sessionStorage
+  useEffect(() => {
+    if (candidateIdParam) {
+      api.getCandidate(candidateIdParam).then(res => {
+        if (res.candidate) {
+          const c = res.candidate;
+          if (c.name) setCandidateName(c.name);
+          if (c.targetRole) setTargetRole(c.targetRole);
+          if (c.resumeText) setResumeText(c.resumeText);
+          if (c.education) setEducation(c.education);
+          if (c.extractedSkills) setDetectedSkills(c.extractedSkills);
+          if (c.resumeClaims && c.resumeClaims.length > 0) {
+            setResumeClaims(c.resumeClaims);
+          }
+        }
+      }).catch(err => console.warn('Could not load candidate param:', err));
+    } else {
+      const draft = sessionStorage.getItem('aii_draft_resume');
+      if (draft) {
+        try {
+          const parsed = JSON.parse(draft);
+          if (parsed.name) setCandidateName(parsed.name);
+          if (parsed.targetRole) setTargetRole(parsed.targetRole);
+          if (parsed.resumeText) setResumeText(parsed.resumeText);
+          if (parsed.education) setEducation(parsed.education);
+          if (parsed.skills) setDetectedSkills(parsed.skills);
+          if (parsed.jobDescription) setJobDescription(parsed.jobDescription);
+        } catch (e) {}
+      }
+    }
+  }, [candidateIdParam]);
+
+  // Preload Sample Candidate Alex Rivera (only upon explicit click)
   const handleLoadSampleData = async () => {
     try {
       const presets = await api.getDemoPresets();
@@ -66,20 +104,33 @@ export function SetupPage() {
       setIsExtracting(true);
       setError(null);
       const res = await api.parseResumeFile(formData);
-      setResumeText(res.text);
+      const extractedText = res.text || res.extractedText || '';
+      setResumeText(extractedText);
 
       // Auto-fill input fields immediately based on extracted resume
-      if (res.candidateName) setCandidateName(res.candidateName);
-      if (res.roleTitle) setTargetRole(res.roleTitle);
+      if (res.candidateName && (!candidateName || candidateName === 'Candidate' || candidateName === 'Alex Rivera')) {
+        setCandidateName(res.candidateName);
+      }
+      if (res.roleTitle && (!targetRole || targetRole === 'Senior AI & Full-Stack Engineer')) {
+        setTargetRole(res.roleTitle);
+      }
+      if (res.education) {
+        setEducation(res.education);
+      }
+      const rawSkills = res.detectedSkills || res.skills || [];
+      if (rawSkills.length > 0) {
+        setDetectedSkills(rawSkills);
+      }
       
       // Auto-fill a tailored Job Description matching candidate's extracted role
+      const effectiveRole = res.roleTitle || targetRole || 'Software Engineer';
       if (!jobDescription.trim()) {
-        setJobDescription(`Position: ${res.roleTitle || 'Senior Software Engineer'}\nKey Responsibilities:\n- Design high-reliability scalable distributed systems with production observability.\n- Implement optimal algorithms adhering to strict latency and memory constraints.\n- Articulate clear architectural trade-offs during live technical evaluation.`);
+        setJobDescription(`Position: ${effectiveRole}\nKey Responsibilities:\n- Deliver reliable, testable engineering implementations matching ${effectiveRole} requirements.\n- Articulate clear architectural trade-offs during live technical evaluation.\n- Analyze computational efficiency, edge cases, and design scalable solutions.`);
       }
 
       // Auto-extract competencies from detected skills
-      if (res.detectedSkills && res.detectedSkills.length > 0) {
-        setCompetencies(res.detectedSkills.slice(0, 6).map((sk, idx) => ({
+      if (rawSkills.length > 0) {
+        setCompetencies(rawSkills.slice(0, 6).map((sk, idx) => ({
           name: sk,
           importance: idx < 2 ? 'high' : 'medium',
           requiredLevel: 'advanced',
@@ -88,11 +139,12 @@ export function SetupPage() {
       }
 
       // Auto-extract claims
-      if (res.extractedClaims && res.extractedClaims.length > 0) {
-        setResumeClaims(res.extractedClaims.map((cl, idx) => ({
+      const rawClaims = res.extractedClaims || res.claims || [];
+      if (rawClaims.length > 0) {
+        setResumeClaims(rawClaims.map((cl, idx) => ({
           id: `claim_${idx + 1}`,
-          claimText: cl,
-          competencyTarget: res.detectedSkills?.[0] || 'Technical Architecture',
+          claimText: typeof cl === 'string' ? cl : (cl.claim || cl.claimText),
+          competencyTarget: rawSkills[0] || 'Technical Architecture',
           verificationStatus: 'untested'
         })));
       }
@@ -113,10 +165,25 @@ export function SetupPage() {
     try {
       setIsExtracting(true);
       setError(null);
-      const res = await api.extractCompetencies({ resumeText, jobDescription });
+      const res = await api.extractCompetencies({ 
+        resumeText, 
+        jobDescription,
+        candidateName,
+        roleTitle: targetRole 
+      });
       if (res.data) {
-        if (res.data.candidateName) setCandidateName(res.data.candidateName);
-        if (res.data.roleTitle) setTargetRole(res.data.roleTitle);
+        if (res.data.candidateName && (!candidateName || candidateName === 'Candidate')) {
+          setCandidateName(res.data.candidateName);
+        }
+        if (res.data.roleTitle && !targetRole) {
+          setTargetRole(res.data.roleTitle);
+        }
+        if (res.data.education && !education) {
+          setEducation(res.data.education);
+        }
+        if (res.data.detectedSkills) {
+          setDetectedSkills(res.data.detectedSkills);
+        }
         setCompetencies(res.data.competencies || []);
         setResumeClaims(res.data.resumeClaims || []);
       }
@@ -160,10 +227,14 @@ export function SetupPage() {
       setIsStarting(true);
       setError(null);
 
+      const finalSkills = detectedSkills.length > 0 ? detectedSkills : competencies.map(c => c.name);
+
       // 1. Create interview session
       const createRes = await api.createInterview({
-        candidateName,
-        targetRole,
+        candidateName: candidateName.trim() || 'Candidate',
+        targetRole: targetRole.trim() || 'Software Engineer',
+        education: education || 'Computer Science & Engineering',
+        skills: finalSkills,
         resumeText,
         jobDescription,
         competencies,
@@ -234,7 +305,7 @@ export function SetupPage() {
                   value={candidateName}
                   onChange={(e) => setCandidateName(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="e.g. Alex Rivera"
+                  placeholder="e.g. Your Name (auto-fills upon upload)"
                 />
               </div>
 
@@ -245,7 +316,7 @@ export function SetupPage() {
                   value={targetRole}
                   onChange={(e) => setTargetRole(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="e.g. Senior AI Engineer"
+                  placeholder="e.g. Full-Stack Developer, ML Engineer, SQL Specialist"
                 />
               </div>
             </div>
